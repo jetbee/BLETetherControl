@@ -1,0 +1,56 @@
+# Generate the Xcode project with:  xcodegen   (then build with ./build.sh or Xcode)
+name: BLETether
+options:
+  bundleIdPrefix: dev.bletether
+  deploymentTarget:
+    macOS: "26.0"
+settings:
+  base:
+    DEVELOPMENT_TEAM: B4NY2F3726   # change to your own team
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  BLETether:
+    type: application
+    platform: macOS
+    sources:
+      - Sources/App
+      - Sources/Shared
+    info:
+      path: App-Info.plist
+      properties:
+        CFBundleDisplayName: BLETether
+        LSUIElement: true
+        NSBluetoothAlwaysUsageDescription: BLETether talks to your phone over Bluetooth to switch its Wi-Fi hotspot on and off.
+    entitlements:
+      path: App.entitlements
+      properties:
+        com.apple.security.application-groups: [B4NY2F3726.dev.bletether]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.bletether.mac
+        ENABLE_HARDENED_RUNTIME: YES
+    dependencies:
+      - target: BLETetherControls
+  BLETetherControls:
+    type: app-extension
+    platform: macOS
+    sources:
+      - Sources/Controls
+      - Sources/Shared
+    info:
+      path: Controls-Info.plist
+      properties:
+        CFBundleDisplayName: BLETether Controls
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: Controls.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.application-groups: [B4NY2F3726.dev.bletether]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.bletether.mac.controls

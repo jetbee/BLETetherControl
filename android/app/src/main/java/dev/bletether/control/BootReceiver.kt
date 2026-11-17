@@ -6,6 +6,7 @@ import android.content.Intent
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        if (!BleGattService.canStart(context)) return
         context.startForegroundService(Intent(context, BleGattService::class.java))
     }
 }

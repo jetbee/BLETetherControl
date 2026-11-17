@@ -8,16 +8,13 @@ import android.net.wifi.WifiManager
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import java.lang.reflect.Proxy
 import java.util.concurrent.Executor
 
 /**
  * Starts/stops Wi-Fi tethering and reports state changes.
  *
- * TetheringManager is a @SystemApi, so it is reached via reflection. This works for
- * apps installed as priv-app with TETHER_PRIVILEGED allowlisted. The exact class and
- * method shapes below follow AOSP (API 30+); verify them on Android 16 / LineageOS on
- * a real device — see README "Things to verify".
+ * The actual switching goes through a [TetherBackend]: priv-app on custom ROMs, Shizuku
+ * otherwise. The backend is chosen per command (see [TetherBackend.select]).
  */
 class TetherController(
     private val ctx: Context,
@@ -62,53 +59,30 @@ class TetherController(
         Protocol.ST_FAILED
     }
 
-    fun start() {
-        runCatching {
-            val tm = ctx.getSystemService("tethering")
-                ?: error("tethering service not available")
-            val tmCls = Class.forName("android.net.TetheringManager")
-            val reqCls = Class.forName("android.net.TetheringManager\$TetheringRequest")
-            val builderCls = Class.forName("android.net.TetheringManager\$TetheringRequest\$Builder")
-            val cbCls = Class.forName("android.net.TetheringManager\$StartTetheringCallback")
-
-            val builder = builderCls.getConstructor(Int::class.javaPrimitiveType).newInstance(TETHERING_WIFI)
-            val request = builderCls.getMethod("build").invoke(builder)
-
-            val callback = Proxy.newProxyInstance(cbCls.classLoader, arrayOf(cbCls)) { _, m, args ->
-                when (m.name) {
-                    "onTetheringFailed" -> {
-                        Log.w(TAG, "startTethering failed: ${args?.firstOrNull()}")
-                        onState(Protocol.ST_FAILED)
-                    }
-                    "onTetheringStarted" -> Log.i(TAG, "startTethering ok")
-                }
-                null
-            }
-
-            tmCls.getMethod("startTethering", reqCls, Executor::class.java, cbCls)
-                .invoke(tm, request, executor, callback)
-            onState(Protocol.ST_STARTING)
-        }.onFailure {
-            Log.e(TAG, "start() failed", it)
-            onState(Protocol.ST_FAILED)
-        }
+    fun start() = withBackend("start") {
+        it.start(executor, onState)
+        onState(Protocol.ST_STARTING)
     }
 
-    fun stop() {
-        runCatching {
-            val tm = ctx.getSystemService("tethering") ?: error("tethering service not available")
-            Class.forName("android.net.TetheringManager")
-                .getMethod("stopTethering", Int::class.javaPrimitiveType)
-                .invoke(tm, TETHERING_WIFI)
-            onState(Protocol.ST_STOPPING)
-        }.onFailure {
-            Log.e(TAG, "stop() failed", it)
+    fun stop() = withBackend("stop") {
+        it.stop(onState)
+        onState(Protocol.ST_STOPPING)
+    }
+
+    private fun withBackend(op: String, block: (TetherBackend) -> Unit) {
+        val (backend, reason) = TetherBackend.select(ctx)
+        if (backend == null) {
+            Log.e(TAG, "$op(): no backend: $reason")
+            onState(Protocol.ST_FAILED)
+            return
+        }
+        runCatching { block(backend) }.onFailure {
+            Log.e(TAG, "$op() via ${backend.name} failed", it)
             onState(Protocol.ST_FAILED)
         }
     }
 
     private companion object {
         const val TAG = "TetherController"
-        const val TETHERING_WIFI = 0
     }
 }

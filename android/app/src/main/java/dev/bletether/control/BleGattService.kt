@@ -48,6 +48,12 @@ class BleGattService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        // Callers check canStart() first; this only guards against a bad start.
+        if (!canStart(this)) {
+            Log.e(TAG, "Bluetooth permissions missing; open the app once to grant them")
+            stopSelf()
+            return
+        }
         startAsForeground()
 
         tether = TetherController(this) { publishStatus(it) }
@@ -185,8 +191,18 @@ class BleGattService : Service() {
         startForeground(1, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
     }
 
-    private companion object {
-        const val TAG = "BleGattService"
-        const val CHANNEL = "ble_tether_control"
+    companion object {
+        private const val TAG = "BleGattService"
+        private const val CHANNEL = "ble_tether_control"
+
+        private val REQUIRED = listOf(
+            android.Manifest.permission.BLUETOOTH_CONNECT,
+            android.Manifest.permission.BLUETOOTH_ADVERTISE,
+        )
+
+        /** A normal install (Shizuku mode) needs these granted from MainActivity first. */
+        fun canStart(ctx: android.content.Context) = REQUIRED.all {
+            ctx.checkSelfPermission(it) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        }
     }
 }

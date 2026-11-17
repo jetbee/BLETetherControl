@@ -19,3 +19,7 @@ __pycache__/
 
 # Local config (contains hotspot password)
 .bletether.json
+
+# Mac build output (project is generated from mac/project.yml)
+mac/build/
+mac/BLETether.xcodeproj/
