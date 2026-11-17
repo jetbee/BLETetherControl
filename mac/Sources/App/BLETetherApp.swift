@@ -6,7 +6,7 @@ import SwiftUI
 
 @main
 struct BLETetherApp: App {
-    @StateObject private var ble = BLEManager()
+    @NSApplicationDelegateAdaptor private var appDelegate: AppDelegate
 
     init() {
         ControlRequests.observe()
@@ -14,20 +14,54 @@ struct BLETetherApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            MenuContent(ble: ble)
+            MenuContent(ble: appDelegate.ble, openSettings: appDelegate.showSettings)
         } label: {
-            Image(systemName: ble.isOn ? "personalhotspot" : "personalhotspot.slash")
+            MenuBarIcon(ble: appDelegate.ble)
         }
+    }
+}
 
-        Settings {
-            SettingsView(ble: ble)
+/// Owns the BLE manager and the Settings window, so Settings can also be opened when the
+/// app is launched again from Finder (it has no Dock icon or main window).
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    let ble = BLEManager()
+    private var settingsWindow: NSWindow?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        if ble.selectedID == nil { showSettings() }
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        showSettings()
+        return false
+    }
+
+    func showSettings() {
+        if settingsWindow == nil {
+            let window = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(ble: ble)))
+            window.title = "BLETether Settings"
+            window.styleMask = [.titled, .closable]
+            window.isReleasedWhenClosed = false
+            window.center()
+            settingsWindow = window
         }
+        NSApp.activate()
+        settingsWindow?.makeKeyAndOrderFront(nil)
+    }
+}
+
+struct MenuBarIcon: View {
+    @ObservedObject var ble: BLEManager
+
+    var body: some View {
+        Image(systemName: ble.isOn ? "personalhotspot" : "personalhotspot.slash")
     }
 }
 
 struct MenuContent: View {
     @ObservedObject var ble: BLEManager
-    @Environment(\.openSettings) private var openSettings
+    let openSettings: () -> Void
 
     var body: some View {
         Text("Phone: \(ble.selectedName.isEmpty ? ble.connection : "\(ble.selectedName) — \(ble.connection)")")
@@ -36,10 +70,7 @@ struct MenuContent: View {
         Button("Tethering ON") { ble.send(Proto.cmdOn) }
         Button("Tethering OFF") { ble.send(Proto.cmdOff) }
         Divider()
-        Button("Settings…") {
-            NSApp.activate()
-            openSettings()
-        }
+        Button("Settings…") { openSettings() }
         .keyboardShortcut(",")
         Button("Quit") { NSApp.terminate(nil) }
             .keyboardShortcut("q")
