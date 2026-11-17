@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Install to: /system/etc/permissions/privapp-permissions-bletethercontrol.xml
+  (or /product/etc/permissions/ on ROMs where the app lives in /product/priv-app)
+-->
+<permissions>
+    <privapp-permissions package="dev.bletether.control">
+        <permission name="android.permission.TETHER_PRIVILEGED" />
+        <permission name="android.permission.WRITE_SETTINGS" />
+        <permission name="android.permission.CHANGE_WIFI_STATE" />
+    </privapp-permissions>
+</permissions>
