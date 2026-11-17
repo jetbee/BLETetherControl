@@ -89,22 +89,26 @@ struct SettingsView: View {
             Section("Phone") {
                 LabeledContent("Selected", value: ble.selectedName.isEmpty ? "None (use first found)" : ble.selectedName)
                 LabeledContent("Status", value: ble.connection)
-                List(ble.found, selection: Binding(
-                    get: { ble.selectedID },
-                    set: { id in
-                        guard let id, let dev = ble.found.first(where: { $0.id == id }) else { return }
-                        ble.selectedName = dev.name
-                        ble.selectedID = id
-                        ble.connect()
-                    })) { dev in
-                    HStack {
-                        Text(dev.name)
-                        Spacer()
-                        Text("\(dev.rssi) dBm").foregroundStyle(.secondary)
-                    }
-                    .tag(dev.id)
+                if ble.found.isEmpty {
+                    Text(ble.isScanning ? "Looking for phones…" : "Press Scan to look for phones running BLETetherControl.")
+                        .foregroundStyle(.secondary)
                 }
-                .frame(minHeight: 100)
+                ForEach(ble.found) { dev in
+                    Button {
+                        ble.selectedName = dev.name
+                        ble.selectedID = dev.id
+                        ble.connect()
+                    } label: {
+                        HStack {
+                            Image(systemName: ble.selectedID == dev.id ? "checkmark.circle.fill" : "circle")
+                            Text(dev.name)
+                            Spacer()
+                            Text("\(dev.rssi) dBm").foregroundStyle(.secondary)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
                 HStack {
                     Button(ble.isScanning ? "Scanning…" : "Scan for Phones") { ble.scanForDevices() }
                         .disabled(ble.isScanning)
@@ -141,8 +145,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 440)
-        .padding(.vertical)
+        .frame(width: 460, height: 560)
     }
 }
 
